@@ -3,8 +3,8 @@
 ---------------------------------------
 Αναγνώριση ορθά δομημένων εκφράσεων παρενθέσεων.
 Σύμβολα:
-  Αριστερή παρένθεση → 'P'
-  Δεξιά   παρένθεση → '0'
+  Αριστερή παρένθεση → 'P' (αρχικό γράμμα επωνύμου: PAPADAKI)
+  Δεξιά   παρένθεση → '0'  (τελευταίο ψηφίο ΑΜ: 2530)
 
 Ορισμός ΝΑΣ ως 6-άδα:
   M = (K, Σ, Γ, δ, q0, Z0)   όπου:
@@ -12,53 +12,48 @@
   K  = {q0, q_err}             πεπερασμένο σύνολο καταστάσεων
   Σ  = {P, 0}                  αλφάβητο εισόδου
   Γ  = {P, Z0}                 αλφάβητο στοίβας
-  δ  = σύνολο κινήσεων (βλ. παρακάτω)
+  δ  = σύνολο κινήσεων
   q0 = q0                      αρχική κατάσταση
   Z0 = Z0                      αρχικό σύμβολο στοίβας
 
   ** Αποδοχή **
   Η συμβολοσειρά αναγνωρίζεται όταν:
-    1. Έχουν διαβαστεί ΟΛΑ τα σύμβολα εισόδου, ΚΑΙ
+    1. Έχουν διαβαστεί όλα τα σύμβολα εισόδου, και
     2. Το αρχικό σύμβολο Z0 βρίσκεται στην κορυφή της στοίβας.
 
 Κινήσεις δ (move):
   Κάθε κίνηση καθορίζεται από τριάδα:
     (τωρινή κατάσταση, σύμβολο στην κορυφή στοίβας, τωρινό σύμβολο εισόδου)
 
-  δ(q0, Z0, P) = (ΒΑΛΕ(P), ΠΡΟΧΩΡΑ, q0)   → push P
-  δ(q0, P,  P) = (ΒΑΛΕ(P), ΠΡΟΧΩΡΑ, q0)   → push P
-  δ(q0, P,  0) = (ΒΓΑΛΕ,   ΠΡΟΧΩΡΑ, q0)   → pop P (ταίριασμα)
-  δ(q0, Z0, 0) = (ΑΦΗΣΕ,   ΚΡΑΤΑ,  q_err) → '0' χωρίς P → σφάλμα
-  -- τέλος εισόδου & Z0 στην κορυφή       → ΑΠΟΔΟΧΗ
-  -- τέλος εισόδου & P  στην κορυφή       → ΑΠΟΡΡΙΨΗ (έμεινε P)
+  δ(q0, Z0|P, P) → push(P),  q0      -- αριστερή παρένθεση: ώθηση στη στοίβα
+  δ(q0, P,   0)  → pop,      q0      -- ταίριασμα: αναίρεση από στοίβα
+  δ(q0, Z0,  0)  → skip,     q_err   -- '0' χωρίς P: σφάλμα
+  δ(q0, Z0,  ε)  → skip,     ACCEPT  -- τέλος εισόδου & Z0: αποδοχή
+  δ(q0, P,   ε)  → skip,     REJECT  -- τέλος εισόδου & P: απόρριψη
+
 """
 
-OPEN   = 'P'    # αριστερή παρένθεση
-CLOSE  = '0'    # δεξιά παρένθεση
-BOTTOM = 'Z0'   # αρχικό σύμβολο στοίβας
+OPEN   = 'P'
+CLOSE  = '0'
+BOTTOM = 'Z0'
 
-# Σύνολο καταστάσεων K
-Q0   = 'q0'
+Q0   = 'q0'   
 QERR = 'q_err'
 
 
 def dpda(expression: str):
-    """
-    Εκτελεί το ΝΑΣ στην έκφραση και τυπώνει κάθε βήμα.
-    Αποδοχή όταν: διαβάστηκε όλη η είσοδος ΚΑΙ Z0 στην κορυφή.
-    Επιστρέφει 'YES' ή 'NO'.
-    """
+
     for ch in expression:
         if ch not in (OPEN, CLOSE):
             print(f"  Μη έγκυρος χαρακτήρας '{ch}'. "
                   f"Η έκφραση πρέπει να περιέχει μόνο '{OPEN}' και '{CLOSE}'.")
-            return 'NO'
+            return
 
-    stack     = [BOTTOM]   # στοίβα — κορυφή = τελευταίο στοιχείο
+    stack     = [BOTTOM]
     state     = Q0
-    remaining = list(expression)
+    symbols   = list(expression)
 
-    header = f"{'Στοίβα':<20} {'Κατάσταση':<10} {'Υπόλοιπη Είσοδος'}"
+    header = f"{'Στοίβα':<25} {'Κατάσταση':<12} {'Υπόλοιπη Είσοδος'}"
     sep    = '-' * len(header)
     print(header)
     print(sep)
@@ -66,77 +61,67 @@ def dpda(expression: str):
     def stack_str():
         return '[' + ', '.join(stack) + ']'
 
-    def print_step(rem_list):
-        rem = ''.join(rem_list) if rem_list else 'ε'
-        print(f"{stack_str():<20} {state:<10} {rem}")
+    def print_step(sym_list):
+        if sym_list:
+            rem = ''.join(sym_list)
+        else:
+            rem = 'ε'
+        print(f"{stack_str():<25} {state:<12} {rem}")
 
     idx      = 0
     accepted = False
 
     while True:
-        print_step(remaining[idx:])
+        print_step(symbols[idx:])
 
         if state == QERR:
             break
 
-        # Τέλος εισόδου — έλεγχος αποδοχής
-        if idx == len(remaining):
-            # Αποδοχή: Z0 στην κορυφή (όλα τα P ταιριάστηκαν)
+        if idx == len(symbols):
             if stack[-1] == BOTTOM:
                 accepted = True
-            # Απόρριψη: P στην κορυφή (έμειναν ανοιχτές παρενθέσεις)
             else:
                 state = QERR
                 print_step([])
             break
 
-        symbol = remaining[idx]
+        symbol = symbols[idx]
         idx += 1
         top = stack[-1]
 
         if symbol == OPEN:
-            # δ(q0, Z0|P, P) = ΒΑΛΕ(P) → push
             stack.append(OPEN)
 
         elif symbol == CLOSE:
             if top == OPEN:
-                # δ(q0, P, 0) = ΒΓΑΛΕ → pop (ταίριασμα)
                 stack.pop()
             else:
-                # δ(q0, Z0, 0) → σφάλμα, '0' χωρίς αντίστοιχο P
                 state = QERR
-                print_step(remaining[idx:])
+                print_step(symbols[idx:])
                 break
 
     print(sep)
     if accepted:
-        print(f"Τέλος εισόδου & Z0 στην κορυφή → ΑΠΟΔΟΧΗ")
+        result = 'YES'
     else:
-        print(f"Απόρριψη")
-    result = 'YES' if accepted else 'NO'
+        result = 'NO'
     print(f"Αποτέλεσμα: {result}\n")
-    return result
-
 
 def main():
     print("=" * 55)
-    print("  ΝΑΣ - Αναγνώριση ορθά δομημένων εκφράσεων παρενθέσεων")
+    print(" ΝΑΣ - ΜΑΙΝ - Αναγνώριση ορθά δομημένων παρενθέσεων")
     print(f"  Αριστερή παρένθεση: '{OPEN}'  |  Δεξιά παρένθεση: '{CLOSE}'")
     print("=" * 55)
     print("Δώστε έκφραση (ή κενό για έξοδο):\n")
 
     while True:
-        try:
-            expr = input("Έκφραση: ").strip()
-        except (EOFError, KeyboardInterrupt):
-            break
+        expr = input("Έκφραση: ").strip()
         if not expr:
             print("Έξοδος.")
             break
         dpda(expr)
 
-
-# --- Demo με παραδείγματα ---
+# Demo - Αυτόματη εκτέλεση παραδειγμάτων
 if __name__ == '__main__':
     examples = [
         ('PP00P0', '(())()'),
@@ -149,16 +134,15 @@ if __name__ == '__main__':
     ]
 
     print("=" * 55)
-    print("  ΝΑΣ - Αναγνώριση Σωστά Φωλιασμένων Παρενθέσεων")
+    print(" ΝΑΣ - DEMO - Αναγνώριση ορθά δομημένων παρενθέσεων")
     print(f"  Αριστερή παρένθεση: '{OPEN}'  |  Δεξιά παρένθεση: '{CLOSE}'")
     print("=" * 55)
-    print("\n=== Αυτόματη Εκτέλεση Παραδειγμάτων ===\n")
 
     for expr, cl in examples:
-        disp = expr if expr else 'ε'
-        print(f"\n>>> Έκφραση: '{disp}'  (κλασ.: '{cl.strip()}')")
+        if expr:
+            disp = expr
+        else:
+            disp = 'ε'
+        print(f"Έκφραση: '{disp}'  [αντίστοιχο: '{cl.strip()}']")
         dpda(expr)
-
-    print("\n=== Ολοκλήρωση Παραδειγμάτων ===")
-    print("\n--- Διαδραστική λειτουργία ---")
     main()
